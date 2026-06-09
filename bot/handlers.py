@@ -8,7 +8,7 @@ from bot.validators import validate_name, validate_email, validate_and_clean_pho
 
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
-    is_registered = await search_user(event.user_id)
+    is_registered = await search_user(event.user.user_id)
     
     if is_registered:
         await event.bot.send_message(
@@ -76,7 +76,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
     
     # Собираем словарь для нашей функции add_user
     user_dict = {
-        "max_user_id": str(event.user_id),
+        "max_user_id": str(event.message.sender.user_id),
         "full_name": user_data["full_name"],
         "email": user_data["email"],
         "phone": user_data["phone"]
