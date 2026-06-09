@@ -2,11 +2,12 @@ from maxapi.types import BotStarted, Command, MessageCreated
 from db.database import search_user, add_user
 from maxapi import Router
 
-router = Router()
+
 from bot.states import RegState
 from maxapi.context.context import MemoryContext
 from bot.validators import validate_name, validate_email, validate_and_clean_phone
 
+router = Router()
 
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
