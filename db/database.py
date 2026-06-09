@@ -2,6 +2,7 @@ import aiosqlite
 
 DB_PATH = "db/bot_users.db"
 
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -15,24 +16,35 @@ async def init_db():
                 )""")
         await db.commit()
 
-async def search_user(max_user_id:int) -> bool:
+
+async def search_user(max_user_id: int) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("""
+        cursor = await db.execute(
+            """
         select max_user_id from users where max_user_id=?;
-        """,(max_user_id,))
+        """,
+            (max_user_id,),
+        )
         return await cursor.fetchone() is not None
 
-async def add_user(user:dict):
+
+async def add_user(user: dict):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+        await db.execute(
+            """
         insert into users (max_user_id,full_name,email,phone) values(?,?,?,?);
-        """,(user["max_user_id"],user["full_name"],user["email"],user["phone"]))
+        """,
+            (user["max_user_id"], user["full_name"], user["email"], user["phone"]),
+        )
         await db.commit()
 
-async def get_user(max_user_id:int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("""
-        select * from users where max_user_id=?
-        """,(max_user_id,))
-        return await cursor.fetchone()
 
+async def get_user(max_user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+        select * from users where max_user_id=?
+        """,
+            (max_user_id,),
+        )
+        return await cursor.fetchone()

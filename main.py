@@ -4,10 +4,9 @@ import asyncio
 import logging
 
 from maxapi import Bot, Dispatcher
-from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi.client.default import DefaultConnectionProperties
 
-from db.database import init_db, search_user
+from db.database import init_db
 from bot.handlers import router
 
 logging.basicConfig(level=logging.INFO)
@@ -15,16 +14,15 @@ logging.basicConfig(level=logging.INFO)
 # Библиотека шлет токен в параметрах, а сервер требует его в заголовке Authorization без слова Bearer.
 bot = Bot(
     BOT_TOKEN,
-    default_connection=DefaultConnectionProperties( headers={'Authorization': BOT_TOKEN})
+    default_connection=DefaultConnectionProperties(
+        headers={"Authorization": BOT_TOKEN}
+    ),
 )
 bot.params.clear()
 
 
-
 dp = Dispatcher()
 dp.include_routers(router)
-
-
 
 
 async def main():
@@ -32,5 +30,5 @@ async def main():
     await dp.start_polling(bot)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
