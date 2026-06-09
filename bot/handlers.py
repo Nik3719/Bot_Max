@@ -1,6 +1,9 @@
 from maxapi.types import BotStarted, Command, MessageCreated
 from db.database import search_user
-from main import dp  # Импортируем диспетчер из главного файла
+from main import dp  
+from bot.states import RegState
+from maxapi.fsm.context import FSMContext
+
 
 # Ответ бота при нажатии на кнопку "Начать"
 @dp.bot_started()
@@ -23,8 +26,8 @@ async def bot_started(event: BotStarted):
             chat_id=event.chat_id,
             text='Ты не зарегистрирован'
         )
+
         
-        await add_user(event.user_id)
     
 
 
