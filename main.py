@@ -18,13 +18,7 @@ bot = Bot(
 )
 bot.params.clear()
 
-dp = Dispatcher()
-
-    
-
-import bot.handlers
-
-    
+from bot.handlers import dp
 
 
 
