@@ -8,6 +8,7 @@ from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi.client.default import DefaultConnectionProperties
 
 from db.database import init_db, search_user
+from bot.handlers import router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,7 +19,10 @@ bot = Bot(
 )
 bot.params.clear()
 
-from bot.handlers import dp
+
+
+dp = Dispatcher()
+dp.include_routers(router)
 
 
 
