@@ -80,7 +80,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
     await event.message.answer("✅ Вы успешно зарегистрированы! Добро пожаловать.")
 
 
-# Команда /start (как запасной вариант)
+# Команда /start
 @router.message_created(Command("start"))
 async def hello(event: MessageCreated):
     await event.message.answer("Пример регистрационного бота 💙")

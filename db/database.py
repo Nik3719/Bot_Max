@@ -39,12 +39,4 @@ async def add_user(user: dict):
         await db.commit()
 
 
-async def get_user(max_user_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            """
-        select * from users where max_user_id=?
-        """,
-            (max_user_id,),
-        )
-        return await cursor.fetchone()
+
