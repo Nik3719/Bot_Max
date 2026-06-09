@@ -25,14 +25,14 @@ async def bot_started(event: BotStarted, context: MemoryContext):
 # шаг 1: Ожидание имени
 @router.message_created(RegState.WAIT_NAME)
 async def process_name(event: MessageCreated, context: MemoryContext):
-    if not validate_name(event.message.text):
+    if not validate_name((event.message.body.text or "")):
         await event.bot.send_message(
             chat_id=event.chat_id,
             text='❌ Некорректное ФИО. Пример: Иванов Иван Иванович'
         )
         return
         
-    await context.update_data(full_name=event.message.text)
+    await context.update_data(full_name=(event.message.body.text or ""))
     
     await event.bot.send_message(
         chat_id=event.chat_id,
@@ -43,14 +43,14 @@ async def process_name(event: MessageCreated, context: MemoryContext):
 # шаг 2: Ожидание почты
 @router.message_created(RegState.WAIT_EMAIL)
 async def process_email(event: MessageCreated, context: MemoryContext):
-    if not validate_email(event.message.text):
+    if not validate_email((event.message.body.text or "")):
         await event.bot.send_message(
             chat_id=event.chat_id,
             text='❌ Некорректный email. Пример: ivanov@example.ru'
         )
         return
         
-    await context.update_data(email=event.message.text)
+    await context.update_data(email=(event.message.body.text or ""))
     
     await event.bot.send_message(
         chat_id=event.chat_id,
@@ -61,7 +61,7 @@ async def process_email(event: MessageCreated, context: MemoryContext):
 # шаг 3: Ожидание телефона и сохранение в БД
 @router.message_created(RegState.WAIT_PHONE)
 async def process_phone(event: MessageCreated, context: MemoryContext):
-    cleaned_phone = validate_and_clean_phone(event.message.text)
+    cleaned_phone = validate_and_clean_phone((event.message.body.text or ""))
     if not cleaned_phone:
         await event.bot.send_message(
             chat_id=event.chat_id,
