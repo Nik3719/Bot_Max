@@ -11,7 +11,7 @@ from bot.handlers import router
 
 logging.basicConfig(level=logging.INFO)
 
-# Библиотека шлет токен в параметрах, а сервер требует его в заголовке Authorization без слова Bearer.
+# Библиотека шлет токен в параметрах, а сервер требует его в заголовке Authorization
 bot = Bot(
     BOT_TOKEN,
     default_connection=DefaultConnectionProperties(
