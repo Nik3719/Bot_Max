@@ -7,6 +7,6 @@ python main.py
 ```
 git clone https://github.com/Nik3719/Bot_Max.git
 cd ./Bot_Max
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 ```  
