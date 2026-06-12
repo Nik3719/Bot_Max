@@ -10,7 +10,9 @@ cd ./Bot_Max
 python3 -m venv venv
 source venv/bin/activate
 ```
-```which pip```
+```
+which pip
+```
 ```
 pip install -r requirements.txt
 ```
