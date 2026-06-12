@@ -4,3 +4,9 @@
 pip install -r requirements.txt
 Затем добавить ваш токен в файл .env (переменная BOT_TOKEN=токен) и запустить основной скрипт с помощью команды:
 python main.py
+```
+git clone https://github.com/Nik3719/Bot_Max.git
+cd ./Bot_Max
+python -m venv venv
+source venv/bin/activate
+```  
