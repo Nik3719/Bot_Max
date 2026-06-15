@@ -10,8 +10,8 @@ async def init_db():
                 id integer primary key autoincrement,
                 max_user_id text unique not null,
                 full_name text not null,
-                email text not null,
-                phone text not null,
+                email text unique not null,
+                phone text unique not null,
                 registered_at datetime default current_timestamp
                 )""")
         await db.commit()
