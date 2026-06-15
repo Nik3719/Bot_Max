@@ -1,16 +1,20 @@
 from maxapi.types import BotStarted, Command, MessageCreated
-from db.database import search_user, add_user
+from db.database import search_user, add_user, is_email_registered, is_phone_registered
 from maxapi import Router
+import logging
 
 
 from bot.states import RegState
 from maxapi.context.context import MemoryContext
 from bot.validators import validate_name, validate_email, validate_and_clean_phone
 
+logger = logging.getLogger(__name__)
+
 router = Router()
 
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
+    logger.info(f"Событие bot_started для пользователя {event.user.user_id}")
     is_registered = await search_user(event.user.user_id)
 
     if is_registered:
@@ -41,11 +45,16 @@ async def process_name(event: MessageCreated, context: MemoryContext):
 # шаг 2: Ожидание почты
 @router.message_created(RegState.WAIT_EMAIL)
 async def process_email(event: MessageCreated, context: MemoryContext):
-    if not validate_email((event.message.body.text or "")):
+    email = (event.message.body.text or "")
+    if not validate_email(email):
         await event.message.answer("❌ Некорректный email. Пример: ivanov@example.ru")
         return
 
-    await context.update_data(email=(event.message.body.text or ""))
+    if await is_email_registered(email):
+        await event.message.answer("❌ Этот email уже зарегистрирован. Пожалуйста, введите другой:")
+        return
+
+    await context.update_data(email=email)
 
     await event.message.answer("📱 Введите ваш номер телефона:")
     await context.set_state(RegState.WAIT_PHONE)
@@ -57,6 +66,10 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
     cleaned_phone = validate_and_clean_phone((event.message.body.text or ""))
     if not cleaned_phone:
         await event.message.answer("❌ Некорректный номер. Пример: +79001234567")
+        return
+
+    if await is_phone_registered(cleaned_phone):
+        await event.message.answer("❌ Этот номер телефона уже зарегистрирован. Пожалуйста, введите другой:")
         return
 
     await context.update_data(phone=cleaned_phone)
@@ -73,7 +86,13 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
     }
 
     # Сохраняем в базу данных
-    await add_user(user_dict)
+    try:
+        await add_user(user_dict)
+        logger.info(f"Пользователь {event.message.sender.user_id} успешно зарегистрирован")
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении пользователя {event.message.sender.user_id} в БД: {e}")
+        await event.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.")
+        return
 
     # Очищаем память состояний, так как регистрация закончена
     await context.clear()
@@ -84,6 +103,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
 # Команда /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated, context: MemoryContext):
+    logger.info(f"Пользователь {event.message.sender.user_id} отправил команду /start")
     is_registered = await search_user(event.message.sender.user_id)
 
     if is_registered:

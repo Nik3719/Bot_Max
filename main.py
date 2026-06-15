@@ -36,7 +36,7 @@ dp.include_routers(router)
 async def main():
     logger.info("Инициализация базы данных")
     await init_db()
-    logger.info("База данных успешно инициализирована")
+    logger.info("База данных успешно инициализирована.")
     
     logger.info("Запуск long-polling бота")
     try:
