@@ -83,5 +83,11 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
 
 # Команда /start
 @router.message_created(Command("start"))
-async def hello(event: MessageCreated):
-    await event.message.answer("Пример регистрационного бота 💙")
+async def cmd_start(event: MessageCreated, context: MemoryContext):
+    is_registered = await search_user(event.message.sender.user_id)
+
+    if is_registered:
+        await event.message.answer("👋 Вы уже зарегистрированы в системе. Спасибо!")
+    else:
+        await event.message.answer("👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):")
+        await context.set_state(RegState.WAIT_NAME)
