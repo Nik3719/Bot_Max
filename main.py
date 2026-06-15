@@ -9,8 +9,16 @@ from maxapi.client.default import DefaultConnectionProperties
 from db.database import init_db
 from bot.handlers import router
 
-logging.basicConfig(level=logging.INFO)
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+logger.info("Бот запускается")
 # Библиотека шлет токен в параметрах, а сервер требует его в заголовке Authorization
 bot = Bot(
     BOT_TOKEN,
@@ -26,9 +34,21 @@ dp.include_routers(router)
 
 
 async def main():
+    logger.info("Инициализация базы данных")
     await init_db()
-    await dp.start_polling(bot)
+    logger.info("База данных успешно инициализирована")
+    
+    logger.info("Запуск long-polling бота")
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Критическая ошибка при работе бота: {e}", exc_info=True)
+    finally:
+        logger.info("Бот остановлен.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Программа завершена (Ctrl+C)")
