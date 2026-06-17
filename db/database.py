@@ -6,29 +6,59 @@ logger = logging.getLogger(__name__)
 DB_PATH = "db/bot_users.db"
 
 
+CREATE_USERS_TABLE = """
+create table if not exists users (
+    id integer primary key autoincrement,
+    max_user_id integer unique not null,
+    full_name text not null,
+    email text unique not null,
+    phone text unique not null,
+    registered_at datetime default current_timestamp
+);
+"""
+
+CREATE_CHAT_MESSAGES_TABLE = """
+create table if not exists chat_messages (
+    id integer primary key autoincrement,
+    max_user_id integer not null,
+    role text not null,
+    content text not null,
+    model text not null,
+    prompt_tokens integer,
+    completion_tokens integer,
+    total_tokens integer generated always as (prompt_tokens + completion_tokens) virtual,
+    duration_ms integer,
+    created_at datetime default current_timestamp
+);
+"""
+
+CREATE_IDX_CHAT_MESSAGES_USER = """
+create index if not exists idx_chat_messages_max_user_id on chat_messages(max_user_id);
+"""
+
+CREATE_IDX_CHAT_MESSAGES_DATE = """
+create index if not exists idx_chat_messages_created_at on chat_messages(created_at);
+"""
+
+SELECT_USER_BY_ID = "select max_user_id from users where max_user_id=?;"
+SELECT_USER_ID_BY_EMAIL = "select id from users where email=?;"
+SELECT_USER_ID_BY_PHONE = "select id from users where phone=?;"
+INSERT_USER = "insert into users (max_user_id, full_name, email, phone) values (?, ?, ?, ?);"
+
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
-            create table if not exists users (
-                id integer primary key autoincrement,
-                max_user_id text unique not null,
-                full_name text not null,
-                email text unique not null,
-                phone text unique not null,
-                registered_at datetime default current_timestamp
-                )""")
+        await db.execute(CREATE_USERS_TABLE)
+        await db.execute(CREATE_CHAT_MESSAGES_TABLE)
+        await db.execute(CREATE_IDX_CHAT_MESSAGES_USER)
+        await db.execute(CREATE_IDX_CHAT_MESSAGES_DATE)
         await db.commit()
 
 
 async def search_user(max_user_id: int) -> bool:
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                """
-            select max_user_id from users where max_user_id=?;
-            """,
-                (max_user_id,),
-            )
+            cursor = await db.execute(SELECT_USER_BY_ID, (max_user_id,))
             return await cursor.fetchone() is not None
     except Exception as e:
         logger.error(f"Ошибка БД при поиске пользователя {max_user_id}: {e}")
@@ -38,28 +68,21 @@ async def search_user(max_user_id: int) -> bool:
 async def is_email_registered(email: str) -> bool:
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                "select id from users where email=?;",
-                (email,),
-            )
+            cursor = await db.execute(SELECT_USER_ID_BY_EMAIL, (email,))
             return await cursor.fetchone() is not None
     except Exception as e:
         logger.error(f"Ошибка БД при поиске email {email}: {e}")
-        return True # В случае ошибки лучше не пропускать регистрацию
+        return True  # В случае ошибки лучше не пропускать регистрацию
 
 
 async def is_phone_registered(phone: str) -> bool:
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            cursor = await db.execute(
-                "select id from users where phone=?;",
-                (phone,),
-            )
+            cursor = await db.execute(SELECT_USER_ID_BY_PHONE, (phone,))
             return await cursor.fetchone() is not None
     except Exception as e:
         logger.error(f"Ошибка БД при поиске телефона {phone}: {e}")
         return True
-
 
 
 async def add_user(user: dict):
@@ -67,15 +90,10 @@ async def add_user(user: dict):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                """
-            insert into users (max_user_id,full_name,email,phone) values(?,?,?,?);
-            """,
+                INSERT_USER,
                 (user["max_user_id"], user["full_name"], user["email"], user["phone"]),
             )
             await db.commit()
     except Exception as e:
         logger.error(f"Ошибка БД при добавлении пользователя: {e}")
         raise e
-
-
-
