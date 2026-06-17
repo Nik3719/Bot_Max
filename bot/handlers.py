@@ -138,6 +138,17 @@ async def cmd_clear(event: MessageCreated, context: MemoryContext):
     await clear_chat_history(user_id) 
     await event.message.answer("🗑️ История диалога очищена. Начинайте новый разговор!")
 
+@router.message_created(RegState.CHAT, Command("history"))
+async def cmd_history(event: MessageCreated, context: MemoryContext):
+    
+    user_id = event.message.sender.user_id
+    history = await get_chat_history(user_id, config.CHAT_HISTORY_LIMIT)
+    if not history:
+        await event.message.answer("История сообщений пуста.")
+        return
+
+    formatted_history = "\n".join([f"{i}. {message['content']}" for i, message in enumerate(history, 1)])
+    await event.message.answer(formatted_history)   
 
 
 @router.message_created(RegState.CHAT)
@@ -149,13 +160,13 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     if not user_text:
         return
 
-    # 1. Получаем историю
+    # Получаем историю
     history = await get_chat_history(user_id_str, config.CHAT_HISTORY_LIMIT)
 
-    # 2. Формируем контекст
+    # Формируем контекст
     messages = build_messages(history, user_text)
 
-    # 3. Отправляем запрос в Ollama
+    # Отправляем запрос в Ollama
     response = await ask_ollama(messages)
 
     if not response:
@@ -172,7 +183,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     completion_tokens = response.get("eval_count", 0)
     duration_ms = response.get("total_duration", 0) // 1000000  # из наносекунд в миллисекунды
 
-    # 4. Сохраняем запрос пользователя в БД
+    # Сохраняем запрос пользователя в БД
     await add_chat_message(
         max_user_id=user_id_int,
         role="user",
@@ -183,7 +194,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         duration_ms=0
     )
 
-    # 5. Сохраняем ответ модели в БД
+    # Сохраняем ответ модели в БД
     await add_chat_message(
         max_user_id=user_id_int,
         role="assistant",
@@ -194,8 +205,9 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         duration_ms=duration_ms
     )
 
-    # 6. Отправляем ответ пользователю
+    # Отправляем ответ пользователю
     await event.message.answer(assistant_text)
+
 
 
 @router.message_created()
