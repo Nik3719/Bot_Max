@@ -7,4 +7,5 @@ from .database import (
     get_chat_history,
     add_chat_message,
     clear_chat_history,
+    get_chat_stats,
 )

@@ -13,6 +13,7 @@ from db import (
     get_chat_history,
     add_chat_message,
     clear_chat_history,
+    get_chat_stats,
 )
 
 from bot import (
@@ -114,21 +115,26 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
     # Очищаем память состояний, так как регистрация закончена
     # await context.clear()
 
-    await event.message.answer("✅ Вы успешно зарегистрированы! Добро пожаловать.")
+    await event.message.answer("✅ Регистрация завершена! Теперь задавайте вопросы — отвечу с помощью ИИ 🤖")
     await context.set_state(RegState.CHAT)
 
 
-# Команда /start
 @router.message_created(Command("start"))
 async def cmd_start(event: MessageCreated, context: MemoryContext):
     logger.info(f"Пользователь {event.message.sender.user_id} отправил команду /start")
     is_registered = await search_user(event.message.sender.user_id)
 
     if is_registered:
-        await event.message.answer("👋 Вы уже зарегистрированы в системе. Спасибо!")
+        await event.message.answer("👋 Вы уже зарегистрированы! Просто напишите вопрос — я отвечу с помощью ИИ.")
+        await context.set_state(RegState.CHAT)
     else:
         await event.message.answer("👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):")
         await context.set_state(RegState.WAIT_NAME)
+
+@router.message_created(RegState.CHAT, Command("help"))
+async def cmd_help(event: MessageCreated, context: MemoryContext):
+    text = "📋 Доступные команды: /start — начало /clear — сброс диалога /history — последние реплики /stats — статистика токенов"
+    await event.message.answer(text)
 
 
 @router.message_created(RegState.CHAT, Command("clear"))
@@ -140,27 +146,42 @@ async def cmd_clear(event: MessageCreated, context: MemoryContext):
 
 @router.message_created(RegState.CHAT, Command("history"))
 async def cmd_history(event: MessageCreated, context: MemoryContext):
-    
-    user_id = event.message.sender.user_id
-    history = await get_chat_history(user_id, config.CHAT_HISTORY_LIMIT)
+    user_id_str = str(event.message.sender.user_id)
+    history = await get_chat_history(user_id_str, 5)
     if not history:
-        await event.message.answer("История сообщений пуста.")
+        await event.message.answer("💬 История пуста. Задайте первый вопрос!")
         return
 
-    formatted_history = "\n".join([f"{i}. {message['content']}" for i, message in enumerate(history, 1)])
-    await event.message.answer(formatted_history)   
+    formatted_history = "\n".join([f"{message['role']}: {message['content']}" for message in history])
+    await event.message.answer(formatted_history)
 
+@router.message_created(RegState.CHAT, Command("stats"))
+async def cmd_stats(event: MessageCreated, context: MemoryContext):
+    user_id = event.message.sender.user_id
+    stats = await get_chat_stats(user_id)
+    text = (
+        f"📊 Ваша статистика:\n"
+        f"• Сообщений: {stats['total_messages']}\n"
+        f"• Токенов потрачено: {stats['total_tokens']}\n"
+        f"• Зарегистрированы: {stats['registered_at']}"
+    )
+    await event.message.answer(text)
 
 @router.message_created(RegState.CHAT)
 async def process_chat_message(event: MessageCreated, context: MemoryContext):
-    user_id_str = str(event.message.sender.user_id)
     user_id_int = event.message.sender.user_id
+    user_id_str = str(user_id_int)
     user_text = event.message.body.text or ""
 
     if not user_text:
         return
 
-    # Получаем историю
+    is_registered = await search_user(user_id_int)
+    if not is_registered:
+        await context.clear()
+        await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
+        return
+
     history = await get_chat_history(user_id_str, config.CHAT_HISTORY_LIMIT)
 
     # Формируем контекст
@@ -212,4 +233,4 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
 
 @router.message_created()
 async def process_unregistered(event: MessageCreated, context: MemoryContext):
-    await event.message.answer("Вы не зарегистрированы. Напишите /start")
+    await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")

@@ -77,7 +77,7 @@ async def is_email_registered(email: str) -> bool:
             return await cursor.fetchone() is not None
     except Exception as e:
         logger.error(f"Ошибка БД при поиске email {email}: {e}")
-        return True  # В случае ошибки лучше не пропускать регистрацию
+        return True
 
 
 async def is_phone_registered(phone: str) -> bool:
@@ -105,12 +105,10 @@ async def add_user(user: dict):
 
 
 async def get_chat_history(max_user_id: str, limit: int) -> list[dict]:
-    """Возвращает последние limit сообщений из chat_messages."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(SELECT_CHAT_HISTORY, (max_user_id, limit))
             rows = await cursor.fetchall()
-            # Разворачиваем — из DESC в хронологический порядок
             return [{'role': r[0], 'content': r[1]} for r in reversed(rows)]
     except Exception as e:
         logger.error(f"Ошибка БД при получении истории для {max_user_id}: {e}")
@@ -118,7 +116,6 @@ async def get_chat_history(max_user_id: str, limit: int) -> list[dict]:
 
 
 async def add_chat_message(max_user_id: int, role: str, content: str, model: str, prompt_tokens: int, completion_tokens: int, duration_ms: int):
-    """Сохраняет сообщение (user или assistant) в базу данных."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
@@ -132,8 +129,25 @@ async def add_chat_message(max_user_id: int, role: str, content: str, model: str
 async def clear_chat_history(max_user_id: int):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("DELETE FROM chat_messages WHERE max_user_id = ?", (max_user_id,))
+            await db.execute("delete from chat_messages where max_user_id = ?", (max_user_id,))
             await db.commit()
     except Exception as e:
         logger.error(f"Ошибка БД при очистке истории для {max_user_id}: {e}")
 
+async def get_chat_stats(max_user_id: int) -> dict:
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor_stats = await db.execute("select count(*), coalesce(sum(total_tokens), 0) from chat_messages where max_user_id = ?", (max_user_id,))
+            stats_row = await cursor_stats.fetchone()
+            
+            cursor_reg = await db.execute("select date(registered_at) from users where max_user_id = ?", (max_user_id,))
+            reg_row = await cursor_reg.fetchone()
+            
+            return {
+                'total_messages': stats_row[0] if stats_row else 0,
+                'total_tokens': stats_row[1] if stats_row else 0,
+                'registered_at': reg_row[0] if reg_row else "неизвестно"
+            }
+    except Exception as e:
+        logger.error(f"Ошибка БД при получении статистики для {max_user_id}: {e}")
+        return {'total_messages': 0, 'total_tokens': 0, 'registered_at': 'неизвестно'}
