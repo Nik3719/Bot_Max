@@ -44,6 +44,7 @@ SELECT_USER_BY_ID = "select max_user_id from users where max_user_id=?;"
 SELECT_USER_ID_BY_EMAIL = "select id from users where email=?;"
 SELECT_USER_ID_BY_PHONE = "select id from users where phone=?;"
 INSERT_USER = "insert into users (max_user_id, full_name, email, phone) values (?, ?, ?, ?);"
+SELECT_CHAT_HISTORY = "select role, content from chat_messages where max_user_id = ? order by created_at desc limit ?;"
 
 
 async def init_db():
@@ -97,3 +98,16 @@ async def add_user(user: dict):
     except Exception as e:
         logger.error(f"Ошибка БД при добавлении пользователя: {e}")
         raise e
+
+
+async def get_chat_history(max_user_id: str, limit: int) -> list[dict]:
+    """Возвращает последние limit сообщений из chat_messages."""
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(SELECT_CHAT_HISTORY, (max_user_id, limit))
+            rows = await cursor.fetchall()
+            # Разворачиваем — из DESC в хронологический порядок
+            return [{'role': r[0], 'content': r[1]} for r in reversed(rows)]
+    except Exception as e:
+        logger.error(f"Ошибка БД при получении истории для {max_user_id}: {e}")
+        return []

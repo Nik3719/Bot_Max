@@ -6,6 +6,12 @@ logger = logging.getLogger(__name__)
 
 client = AsyncClient(host=config.OLLAMA_HOST)
 
+def build_messages(history: list, current_text: str) -> list[dict]:
+    """Формирует контекст для отправки в Ollama (системный промпт + история + новый запрос)."""
+    system = {'role': 'system', 'content': config.OLLAMA_SYSTEM_PROMPT}
+    user   = {'role': 'user',   'content': current_text}
+    return [system] + history + [user]
+
 async def ask_ollama(messages: list[dict[str,str]]) -> dict:
     try:
         response = await client.chat(
