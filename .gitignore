@@ -4,5 +4,6 @@ venv/
 db/bot_users.db
 __pycache__/
 .vscode/
-1.txt
+*.txt
 *.log
+*.docx
