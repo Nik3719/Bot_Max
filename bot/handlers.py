@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
+
+
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
     logger.info(f"Событие bot_started для пользователя {event.user.user_id}")
@@ -95,9 +97,10 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
         return
 
     # Очищаем память состояний, так как регистрация закончена
-    await context.clear()
+    # await context.clear()
 
     await event.message.answer("✅ Вы успешно зарегистрированы! Добро пожаловать.")
+    await context.set_state(RegState.CHAT)
 
 
 # Команда /start
@@ -111,3 +114,19 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
     else:
         await event.message.answer("👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):")
         await context.set_state(RegState.WAIT_NAME)
+
+
+@router.message_created(RegState.CHAT)
+async def process_chat_message(event: MessageCreated, context: MemoryContext):
+    messages = context.get("messages", [])
+    messages.append({
+        "role": "user",
+        "content": event.message.body.text
+    })
+    response = await ask_ollama(messages)
+    await event.message.answer(response["message"]["content"])
+
+
+@router.message_created()
+async def process_unregistered(event: MessageCreated, context: MemoryContext):
+    await event.message.answer("Вы не зарегистрированы. Напишите /start")
