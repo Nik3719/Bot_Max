@@ -45,6 +45,10 @@ SELECT_USER_ID_BY_EMAIL = "select id from users where email=?;"
 SELECT_USER_ID_BY_PHONE = "select id from users where phone=?;"
 INSERT_USER = "insert into users (max_user_id, full_name, email, phone) values (?, ?, ?, ?);"
 SELECT_CHAT_HISTORY = "select role, content from chat_messages where max_user_id = ? order by created_at desc limit ?;"
+INSERT_CHAT_MESSAGE = """
+insert into chat_messages (max_user_id, role, content, model, prompt_tokens, completion_tokens, duration_ms)
+values (?, ?, ?, ?, ?, ?, ?);
+"""
 
 
 async def init_db():
@@ -111,3 +115,25 @@ async def get_chat_history(max_user_id: str, limit: int) -> list[dict]:
     except Exception as e:
         logger.error(f"Ошибка БД при получении истории для {max_user_id}: {e}")
         return []
+
+
+async def add_chat_message(max_user_id: int, role: str, content: str, model: str, prompt_tokens: int, completion_tokens: int, duration_ms: int):
+    """Сохраняет сообщение (user или assistant) в базу данных."""
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                INSERT_CHAT_MESSAGE,
+                (max_user_id, role, content, model, prompt_tokens, completion_tokens, duration_ms),
+            )
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Ошибка БД при добавлении сообщения для {max_user_id}: {e}")
+
+async def clear_chat_history(max_user_id: int):
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("DELETE FROM chat_messages WHERE max_user_id = ?", (max_user_id,))
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Ошибка БД при очистке истории для {max_user_id}: {e}")
+

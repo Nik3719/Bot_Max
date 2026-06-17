@@ -1,13 +1,28 @@
-from maxapi.types import BotStarted, Command, MessageCreated
-from db.database import search_user, add_user, is_email_registered, is_phone_registered
-from maxapi import Router
 import logging
+import config
 
-
-from bot.states import RegState
+from maxapi.types import BotStarted, Command, MessageCreated
+from maxapi import Router
 from maxapi.context.context import MemoryContext
-from bot.validators import validate_name, validate_email, validate_and_clean_phone
 
+from db import (
+    search_user,
+    add_user,
+    is_email_registered,
+    is_phone_registered,
+    get_chat_history,
+    add_chat_message,
+    clear_chat_history,
+)
+
+from bot import (
+    RegState,
+    validate_name,
+    validate_email,
+    validate_and_clean_phone,
+    ask_ollama,
+    build_messages,
+)
 logger = logging.getLogger(__name__)
 
 router = Router()
@@ -116,15 +131,71 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
         await context.set_state(RegState.WAIT_NAME)
 
 
+@router.message_created(RegState.CHAT, Command("clear"))
+async def cmd_clear(event: MessageCreated, context: MemoryContext):
+    
+    user_id = event.message.sender.user_id
+    await clear_chat_history(user_id) 
+    await event.message.answer("🗑️ История диалога очищена. Начинайте новый разговор!")
+
+
+
 @router.message_created(RegState.CHAT)
 async def process_chat_message(event: MessageCreated, context: MemoryContext):
-    messages = context.get("messages", [])
-    messages.append({
-        "role": "user",
-        "content": event.message.body.text
-    })
+    user_id_str = str(event.message.sender.user_id)
+    user_id_int = event.message.sender.user_id
+    user_text = event.message.body.text or ""
+
+    if not user_text:
+        return
+
+    # 1. Получаем историю
+    history = await get_chat_history(user_id_str, config.CHAT_HISTORY_LIMIT)
+
+    # 2. Формируем контекст
+    messages = build_messages(history, user_text)
+
+    # 3. Отправляем запрос в Ollama
     response = await ask_ollama(messages)
-    await event.message.answer(response["message"]["content"])
+
+    if not response:
+        await event.message.answer("⚠️ Не удалось получить ответ от ИИ. Попробуйте позже.")
+        return
+
+    if "message" not in response or not response["message"].get("content"):
+        await event.message.answer("🤔 Модель вернула пустой ответ. Попробуйте перефразировать вопрос.")
+        return
+
+    # Извлекаем данные из ответа
+    assistant_text = response["message"]["content"]
+    prompt_tokens = response.get("prompt_eval_count", 0)
+    completion_tokens = response.get("eval_count", 0)
+    duration_ms = response.get("total_duration", 0) // 1000000  # из наносекунд в миллисекунды
+
+    # 4. Сохраняем запрос пользователя в БД
+    await add_chat_message(
+        max_user_id=user_id_int,
+        role="user",
+        content=user_text,
+        model=config.OLLAMA_MODEL,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=0,
+        duration_ms=0
+    )
+
+    # 5. Сохраняем ответ модели в БД
+    await add_chat_message(
+        max_user_id=user_id_int,
+        role="assistant",
+        content=assistant_text,
+        model=config.OLLAMA_MODEL,
+        prompt_tokens=0,
+        completion_tokens=completion_tokens,
+        duration_ms=duration_ms
+    )
+
+    # 6. Отправляем ответ пользователю
+    await event.message.answer(assistant_text)
 
 
 @router.message_created()

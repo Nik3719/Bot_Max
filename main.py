@@ -6,7 +6,7 @@ import logging
 from maxapi import Bot, Dispatcher
 from maxapi.client.default import DefaultConnectionProperties
 
-from db.database import init_db
+from db import init_db
 from bot.handlers import router
 
 logging.basicConfig(
