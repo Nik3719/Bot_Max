@@ -133,7 +133,13 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
 
 @router.message_created(RegState.CHAT, Command("help"))
 async def cmd_help(event: MessageCreated, context: MemoryContext):
-    text = "📋 Доступные команды: /start — начало /clear — сброс диалога /history — последние реплики /stats — статистика токенов"
+    text = (
+        "Доступные команды:\n\n"
+        "/start — начало\n"
+        "/clear — сброс диалога\n"
+        "/history — последние реплики\n"
+        "/stats — статистика токенов"
+    )
     await event.message.answer(text)
 
 
@@ -160,10 +166,10 @@ async def cmd_stats(event: MessageCreated, context: MemoryContext):
     user_id = event.message.sender.user_id
     stats = await get_chat_stats(user_id)
     text = (
-        f"📊 Ваша статистика:\n"
-        f"• Сообщений: {stats['total_messages']}\n"
-        f"• Токенов потрачено: {stats['total_tokens']}\n"
-        f"• Зарегистрированы: {stats['registered_at']}"
+        f"Ваша статистика:\n"
+        f"Сообщений: {stats['total_messages']}\n"
+        f"Токенов потрачено: {stats['total_tokens']}\n"
+        f"Зарегистрированы: {stats['registered_at']}"
     )
     await event.message.answer(text)
 
