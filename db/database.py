@@ -104,7 +104,7 @@ async def add_user(user: dict):
         raise e
 
 
-async def get_chat_history(max_user_id: str, limit: int) -> list[dict]:
+async def get_chat_history(max_user_id: int, limit: int) -> list[dict]:
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute(SELECT_CHAT_HISTORY, (max_user_id, limit))

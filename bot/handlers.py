@@ -97,7 +97,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
 
     # Собираем словарь для нашей функции add_user
     user_dict = {
-        "max_user_id": str(event.message.sender.user_id),
+        "max_user_id": event.message.sender.user_id,
         "full_name": user_data["full_name"],
         "email": user_data["email"],
         "phone": user_data["phone"],
@@ -152,8 +152,8 @@ async def cmd_clear(event: MessageCreated, context: MemoryContext):
 
 @router.message_created(RegState.CHAT, Command("history"))
 async def cmd_history(event: MessageCreated, context: MemoryContext):
-    user_id_str = str(event.message.sender.user_id)
-    history = await get_chat_history(user_id_str, 5)
+    user_id = event.message.sender.user_id
+    history = await get_chat_history(user_id, 5)
     if not history:
         await event.message.answer("💬 История пуста. Задайте первый вопрос!")
         return
