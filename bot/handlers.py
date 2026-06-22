@@ -1,7 +1,6 @@
 import logging
+import asyncio
 import config
-from aiolimiter import AsyncLimiter
-
 from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi import Router
 from maxapi.context.context import MemoryContext
@@ -29,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
-user_rate_limiters: dict[int, AsyncLimiter] = {}
+user_last_message_time: dict[int, float] = {}
+user_last_warning_time: dict[int, float] = {}
 
 
 
@@ -176,17 +176,23 @@ async def cmd_stats(event: MessageCreated, context: MemoryContext):
     )
     await event.message.answer(text)
 
-async def check_rate_limit(user_id: int) -> bool:
-    """Проверяет рейт-лимит для пользователя."""
-    if user_id not in user_rate_limiters:
-        user_rate_limiters[user_id] = AsyncLimiter(max_rate=1, time_period=3)
+async def check_rate_limit(user_id: int, message_timestamp: int) -> tuple[bool, bool]:
+    """Проверяет рейт-лимит для пользователя на основе времени отправки."""
+    # API возвращает timestamp в миллисекундах — переводим в секунды
+    ts_sec = message_timestamp / 1000
+    last_time = user_last_message_time.get(user_id, 0)
+    logger.info(f"check_rate_limit: user_id={user_id}, ts_sec={ts_sec:.2f}, last_time={last_time:.2f}, diff={ts_sec - last_time:.2f}")
 
-    limiter = user_rate_limiters[user_id]
-    if not limiter.has_capacity():
-        return False
+    if ts_sec - last_time < 3:
+        last_warning = user_last_warning_time.get(user_id, 0)
+        # Отправляем предупреждение, только если с прошлого предупреждения прошло время
+        if ts_sec - last_warning >= 5:
+            user_last_warning_time[user_id] = ts_sec
+            return False, True
+        return False, False
 
-    await limiter.acquire()
-    return True
+    user_last_message_time[user_id] = ts_sec
+    return True, False
 
 
 async def send_long_message(event: MessageCreated, text: str, max_len: int = 3000):
@@ -226,8 +232,10 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         return
 
     # Проверка анти-спама
-    if not await check_rate_limit(user_id_int):
-        await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
+    is_allowed, should_warn = await check_rate_limit(user_id_int, event.message.timestamp)
+    if not is_allowed:
+        if should_warn:
+            await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
         return
 
     # Проверка доступа (регистрации)
@@ -241,6 +249,13 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     history = await get_chat_history(str(user_id_int), config.CHAT_HISTORY_LIMIT)
     messages = build_messages(history, user_text)
     
+    # Запуск обработки в фоне, чтобы не блокировать получение новых сообщений
+    # и позволить rate limiter'у сразу отвечать на следующие сообщения
+    asyncio.create_task(
+        handle_ollama_request(event, user_id_int, user_text, messages)
+    )
+
+async def handle_ollama_request(event: MessageCreated, user_id_int: int, user_text: str, messages: list):
     # Запрос к нейросети
     response = await ask_ollama(messages)
 
