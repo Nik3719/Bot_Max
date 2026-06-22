@@ -250,14 +250,19 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     messages = build_messages(history, user_text)
     
     # Запуск обработки в фоне, чтобы не блокировать получение новых сообщений
-    # и позволить rate limiter'у сразу отвечать на следующие сообщения
+    # и позволить rate limiter сразу отвечать на следующие сообщения
     asyncio.create_task(
         handle_ollama_request(event, user_id_int, user_text, messages)
     )
 
 async def handle_ollama_request(event: MessageCreated, user_id_int: int, user_text: str, messages: list):
-    # Запрос к нейросети
-    response = await ask_ollama(messages)
+    # Запрос к нейросети с обработкой ошибок
+    try:
+        response = await ask_ollama(messages)
+    except Exception as e:
+        logger.error(f"Ошибка при запросе к Ollama: {e}")
+        await event.message.answer("⚠️ Не удалось получить ответ от ИИ из‑за ошибки сервера. Попробуйте позже.")
+        return
 
     if not response:
         await event.message.answer("⚠️ Не удалось получить ответ от ИИ. Попробуйте позже.")
@@ -268,6 +273,7 @@ async def handle_ollama_request(event: MessageCreated, user_id_int: int, user_te
         return
 
     assistant_text = response["message"]["content"]
+    logger.info(f"Ollama ответ получен, длина={len(assistant_text)} символов")
 
     # Сохраняем запрос пользователя в БД
     await add_chat_message(
