@@ -1,5 +1,6 @@
 import logging
 import config
+import time
 
 from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi import Router
@@ -27,6 +28,7 @@ from bot import (
 logger = logging.getLogger(__name__)
 
 router = Router()
+user_last_message_time = {}
 
 
 
@@ -181,6 +183,15 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
 
     if not user_text:
         return
+
+    current_time = time.time()
+    if user_id_int in user_last_message_time:
+        time_passed = current_time - user_last_message_time[user_id_int]
+        if time_passed < config.RATE_LIMIT:
+            await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
+            return
+
+    user_last_message_time[user_id_int] = current_time
 
     is_registered = await search_user(user_id_int)
     if not is_registered:
