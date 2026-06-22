@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+client = AsyncClient(host=config.OLLAMA_HOST)
 
 def build_messages(history: list, current_text: str) -> list[dict]:
     """Формирует контекст для отправки в Ollama (системный промпт + история + новый запрос)."""
