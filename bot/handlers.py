@@ -1,6 +1,6 @@
 import logging
 import config
-import time
+from aiolimiter import AsyncLimiter
 
 from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi import Router
@@ -28,7 +28,8 @@ from bot import (
 logger = logging.getLogger(__name__)
 
 router = Router()
-user_last_message_time = {}
+
+user_rate_limiters: dict[int, AsyncLimiter] = {}
 
 
 
@@ -175,36 +176,72 @@ async def cmd_stats(event: MessageCreated, context: MemoryContext):
     )
     await event.message.answer(text)
 
+async def check_rate_limit(user_id: int) -> bool:
+    """Проверяет рейт-лимит для пользователя."""
+    if user_id not in user_rate_limiters:
+        user_rate_limiters[user_id] = AsyncLimiter(max_rate=1, time_period=3)
+
+    limiter = user_rate_limiters[user_id]
+    if not limiter.has_capacity():
+        return False
+
+    await limiter.acquire()
+    return True
+
+
+async def send_long_message(event: MessageCreated, text: str, max_len: int = 3000):
+    """Отправляет длинное сообщение по частям, если оно превышает лимит."""
+    if len(text) <= max_len:
+        await event.message.answer(text)
+        return
+
+    paragraphs = text.split('\n')
+    current_msg = ""
+    for p in paragraphs:
+        p_len = len(p) + (1 if current_msg else 0)
+        
+        if len(current_msg) + p_len <= max_len:
+            current_msg += ("\n" + p) if current_msg else p
+        else:
+            if current_msg:
+                await event.message.answer(current_msg)
+                current_msg = ""
+            
+            if len(p) > max_len:
+                for i in range(0, len(p), max_len):
+                    await event.message.answer(p[i : i + max_len])
+            else:
+                current_msg = p
+                
+    if current_msg:
+        await event.message.answer(current_msg)
+
+
 @router.message_created(RegState.CHAT)
 async def process_chat_message(event: MessageCreated, context: MemoryContext):
     user_id_int = event.message.sender.user_id
-    user_id_str = str(user_id_int)
     user_text = event.message.body.text or ""
 
     if not user_text:
         return
 
-    current_time = time.time()
-    if user_id_int in user_last_message_time:
-        time_passed = current_time - user_last_message_time[user_id_int]
-        if time_passed < config.RATE_LIMIT:
-            await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
-            return
+    # Проверка анти-спама
+    if not await check_rate_limit(user_id_int):
+        await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
+        return
 
-    user_last_message_time[user_id_int] = current_time
-
+    # Проверка доступа (регистрации)
     is_registered = await search_user(user_id_int)
     if not is_registered:
         await context.clear()
         await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
         return
 
-    history = await get_chat_history(user_id_str, config.CHAT_HISTORY_LIMIT)
-
-    # Формируем контекст
+    # Получение истории и формирование контекста
+    history = await get_chat_history(str(user_id_int), config.CHAT_HISTORY_LIMIT)
     messages = build_messages(history, user_text)
-
-    # Отправляем запрос в Ollama
+    
+    # Запрос к нейросети
     response = await ask_ollama(messages)
 
     if not response:
@@ -215,11 +252,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         await event.message.answer("🤔 Модель вернула пустой ответ. Попробуйте перефразировать вопрос.")
         return
 
-    # Извлекаем данные из ответа
     assistant_text = response["message"]["content"]
-    prompt_tokens = response.get("prompt_eval_count", 0)
-    completion_tokens = response.get("eval_count", 0)
-    duration_ms = response.get("total_duration", 0) // 1000000  # из наносекунд в миллисекунды
 
     # Сохраняем запрос пользователя в БД
     await add_chat_message(
@@ -227,7 +260,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         role="user",
         content=user_text,
         model=config.OLLAMA_MODEL,
-        prompt_tokens=prompt_tokens,
+        prompt_tokens=response.get("prompt_eval_count", 0),
         completion_tokens=0,
         duration_ms=0
     )
@@ -239,12 +272,12 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         content=assistant_text,
         model=config.OLLAMA_MODEL,
         prompt_tokens=0,
-        completion_tokens=completion_tokens,
-        duration_ms=duration_ms
+        completion_tokens=response.get("eval_count", 0),
+        duration_ms=response.get("total_duration", 0) // 1000000
     )
 
-    # Отправляем ответ пользователю
-    await event.message.answer(assistant_text)
+    # Отправляем ответ с учетом лимита на символы
+    await send_long_message(event, assistant_text)
 
 
 

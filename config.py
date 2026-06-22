@@ -10,7 +10,6 @@ BOT_LINK = os.getenv("BOT_LINK", "")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", 120))
-RATE_LIMIT = int(os.getenv("RATE_LIMIT", 3))
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", 0.7))
 OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", 4096))
 OLLAMA_SYSTEM_PROMPT = os.getenv(
