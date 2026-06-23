@@ -35,7 +35,6 @@ user_last_warning_time: dict[int, float] = {}
 
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
-    # Платформа может отправлять событие bot_started и команду /start одновременно.
     # Чтобы не отправлять два приветствия, оставляем здесь только логирование.
     logger.info(f"Событие bot_started для пользователя {event.user.user_id}")
 
@@ -118,6 +117,7 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
     is_registered = await search_user(event.message.sender.user_id)
 
     if is_registered:
+        await context.clear()
         await event.message.answer("👋 Вы уже зарегистрированы! Просто напишите вопрос — я отвечу с помощью ИИ.")
         await context.set_state(RegState.CHAT)
     else:
