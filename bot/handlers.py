@@ -35,19 +35,9 @@ user_last_warning_time: dict[int, float] = {}
 
 @router.bot_started()
 async def bot_started(event: BotStarted, context: MemoryContext):
+    # Платформа может отправлять событие bot_started и команду /start одновременно.
+    # Чтобы не отправлять два приветствия, оставляем здесь только логирование.
     logger.info(f"Событие bot_started для пользователя {event.user.user_id}")
-    is_registered = await search_user(event.user.user_id)
-
-    if is_registered:
-        await event.bot.send_message(
-            chat_id=event.chat_id, text="👋 Вы уже зарегистрированы в системе. Спасибо!"
-        )
-    else:
-        await event.bot.send_message(
-            chat_id=event.chat_id,
-            text="👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):",
-        )
-        await context.set_state(RegState.WAIT_NAME)
 
 
 # шаг 1: Ожидание имени
@@ -223,6 +213,15 @@ async def send_long_message(event: MessageCreated, text: str, max_len: int = 300
         await event.message.answer(current_msg)
 
 
+async def ensure_registered(event: MessageCreated, user_id: int) -> bool:
+    """Проверяет регистрацию пользователя и отправляет предупреждение, если доступа нет."""
+    is_registered = await search_user(user_id)
+    if not is_registered:
+        await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
+        return False
+    return True
+
+
 @router.message_created(RegState.CHAT)
 async def process_chat_message(event: MessageCreated, context: MemoryContext):
     user_id_int = event.message.sender.user_id
@@ -239,10 +238,8 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         return
 
     # Проверка доступа (регистрации)
-    is_registered = await search_user(user_id_int)
-    if not is_registered:
+    if not await ensure_registered(event, user_id_int):
         await context.clear()
-        await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
         return
 
     # Получение истории и формирование контекста
@@ -311,4 +308,9 @@ async def handle_ollama_request(event: MessageCreated, user_id_int: int, user_te
 
 @router.message_created()
 async def process_unregistered(event: MessageCreated, context: MemoryContext):
-    await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
+    user_id = event.message.sender.user_id
+    if await ensure_registered(event, user_id):
+        # Если бот перезапускался, стейты в памяти сбросились.
+        # Восстанавливаем состояние и обрабатываем сообщение:
+        await context.set_state(RegState.CHAT)
+        await process_chat_message(event, context)
