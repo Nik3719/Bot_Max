@@ -116,7 +116,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
         return
 
     # Очищаем память состояний, так как регистрация закончена
-    # await context.clear()
+    await context.clear()
 
     await event.message.answer("✅ Регистрация завершена! Теперь задавайте вопросы — отвечу с помощью ИИ 🤖")
     await context.set_state(RegState.CHAT)
@@ -246,7 +246,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         return
 
     # Получение истории и формирование контекста
-    history = await get_chat_history(str(user_id_int), config.CHAT_HISTORY_LIMIT)
+    history = await get_chat_history(user_id_int, config.CHAT_HISTORY_LIMIT)
     messages = build_messages(history, user_text)
     
     # Запуск обработки в фоне, чтобы не блокировать получение новых сообщений
@@ -256,6 +256,13 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     )
 
 async def handle_ollama_request(event: MessageCreated, user_id_int: int, user_text: str, messages: list):
+    # Отправляем индикатор «печатает...»
+    try:
+        chat_to_action = event.message.recipient.chat_id or user_id_int
+        await event.bot.send_action(chat_id=chat_to_action)
+    except Exception as e:
+        logger.warning(f"Не удалось отправить индикатор 'печатает': {e}")
+
     # Запрос к нейросети с обработкой ошибок
     try:
         response = await ask_ollama(messages)
