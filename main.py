@@ -9,6 +9,7 @@ from maxapi.client.default import DefaultConnectionProperties
 from db import init_db
 from bot.handlers import router as handlers_router
 from bot.callbacks import router as callbacks_router
+from bot.menu import menu_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +32,8 @@ bot.params.clear()
 
 
 dp = Dispatcher()
-dp.include_routers(handlers_router, callbacks_router)
+# Подключаем роутеры (важен порядок: меню ловит текст кнопок раньше общего обработчика сообщений)
+dp.include_routers(menu_router, handlers_router, callbacks_router)
 
 
 async def main():

@@ -26,6 +26,7 @@ from db import (
     set_current_chat_id,
     count_user_chats,
 )
+from bot.menu import get_main_menu
 
 from bot import (
     RegState,
@@ -156,7 +157,10 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
         elif not current_chat_id and not chats:
             current_chat_id = await create_chat(user_id)
             
-        await event.message.answer("👋 Вы уже зарегистрированы! Просто напишите вопрос — я отвечу с помощью ИИ.")
+        await event.message.answer(
+            "👋 Вы уже зарегистрированы! Просто напишите вопрос — я отвечу с помощью ИИ.",
+            attachments=[get_main_menu()]
+        )
         await context.set_state(RegState.CHAT)
     else:
         await event.message.answer("👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):")
@@ -174,7 +178,7 @@ async def cmd_help(event: MessageCreated, context: MemoryContext):
         "/history — последние реплики\n"
         "/stats — статистика"
     )
-    await event.message.answer(text)
+    await event.message.answer(text, attachments=[get_main_menu()])
 
 @router.message_created(RegState.CHAT, Command("newchat"))
 async def cmd_newchat(event: MessageCreated, context: MemoryContext):
