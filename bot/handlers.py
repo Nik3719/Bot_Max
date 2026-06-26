@@ -5,6 +5,9 @@ from maxapi.types import BotStarted, Command, MessageCreated
 from maxapi import Router
 from maxapi.context.context import MemoryContext
 
+from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
+from maxapi.types.attachments.buttons import CallbackButton
+
 from db import (
     search_user,
     add_user,
@@ -199,13 +202,17 @@ async def cmd_chats(event: MessageCreated, context: MemoryContext):
         
     current_chat_id = await get_current_chat_id(user_id)
     
-    text = "Ваши чаты:\n\n"
+    builder = InlineKeyboardBuilder()
+    
     for idx, chat in enumerate(chats, start=1):
         marker = "🟢" if chat['id'] == current_chat_id else "⚪"
-        text += f"{marker} {idx}. {chat['title']}\n"
+        btn_text = f"{marker} {chat['title']}"
+        builder.row(CallbackButton(text=btn_text, payload=f"switch_chat_{chat['id']}"))
         
-    text += "\nЧтобы переключиться на другой чат, отправьте номер чата (например: 2)."
-    await event.message.answer(text)
+    builder.row(CallbackButton(text="➕ Создать новый чат", payload="new_chat"))
+    
+    markup = builder.as_markup()
+    await event.message.answer("Ваши чаты:", attachments=[markup])
 
 @router.message_created(RegState.CHAT, Command("rename"))
 async def cmd_rename(event: MessageCreated, context: MemoryContext):
@@ -245,18 +252,14 @@ async def cmd_delete(event: MessageCreated, context: MemoryContext):
     chat = await get_chat(current_chat_id)
     title = chat['title'] if chat else "Неизвестный чат"
     
-    await delete_chat(current_chat_id)
-    await event.message.answer(f"ℹ️ Чат «{title}» удалён.")
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        CallbackButton(text="✅ Да", payload="confirm_delete"),
+        CallbackButton(text="❌ Нет", payload="cancel_delete")
+    )
+    markup = builder.as_markup()
     
-    chats = await get_user_chats(user_id)
-    if chats:
-        new_active = chats[0]
-        await set_current_chat_id(user_id, new_active['id'])
-        await event.message.answer(f"ℹ️ Переключил на чат «{new_active['title']}».")
-    else:
-        new_id = await create_chat(user_id)
-        if new_id:
-            await event.message.answer("ℹ️ Создан новый пустой чат, так как вы удалили последний.")
+    await event.message.answer(f"Вы уверены, что хотите удалить чат «{title}»?", attachments=[markup])
 
 @router.message_created(RegState.CHAT, Command("clear"))
 async def cmd_clear(event: MessageCreated, context: MemoryContext):
@@ -352,20 +355,10 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     if not user_text:
         return
 
-    # Проверка на выбор чата по номеру из списка /chats
-    if user_text.isdigit():
-        idx = int(user_text)
-        chats = await get_user_chats(user_id_int)
-        if 1 <= idx <= len(chats):
-            selected_chat = chats[idx-1]
-            await set_current_chat_id(user_id_int, selected_chat['id'])
-            
-            # Показать превью
-            preview_history = await get_chat_history(selected_chat['id'], config.CHAT_PREVIEW_LINES)
-            preview_text = "\n".join([f"ℹ️ {msg['role']}: {msg['content'][:50]}..." for msg in preview_history])
-            
-            await event.message.answer(f"ℹ️ Переключил на чат «{selected_chat['title']}».\nПоследние сообщения:\n{preview_text}")
-            return
+    if user_text.startswith('/'):
+        logger.info(f"Received unknown command: {repr(user_text)}")
+        await event.message.answer("⚠️ Неизвестная команда или опечатка. Введите /help для списка доступных команд.")
+        return
 
     is_allowed, should_warn = await check_rate_limit(user_id_int, event.message.timestamp)
     if not is_allowed:
@@ -450,4 +443,28 @@ async def process_unregistered(event: MessageCreated, context: MemoryContext):
     user_id = event.message.sender.user_id
     if await ensure_registered(event, user_id):
         await context.set_state(RegState.CHAT)
-        await process_chat_message(event, context)
+        
+        user_text = event.message.body.text or ""
+        if user_text.startswith('/'):
+            cmd = user_text.split()[0]
+            if cmd == '/help':
+                await cmd_help(event, context)
+            elif cmd == '/newchat':
+                await cmd_newchat(event, context)
+            elif cmd == '/chats':
+                await cmd_chats(event, context)
+            elif cmd == '/rename':
+                await cmd_rename(event, context)
+            elif cmd == '/delete':
+                await cmd_delete(event, context)
+            elif cmd == '/clear':
+                await cmd_clear(event, context)
+            elif cmd == '/history':
+                await cmd_history(event, context)
+            elif cmd == '/stats':
+                await cmd_stats(event, context)
+            else:
+                logger.info(f"Received unknown command (state restored): {repr(user_text)}")
+                await event.message.answer("⚠️ Неизвестная команда или опечатка. Введите /help для списка доступных команд.")
+        else:
+            await process_chat_message(event, context)

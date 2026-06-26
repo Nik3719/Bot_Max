@@ -7,7 +7,8 @@ from maxapi import Bot, Dispatcher
 from maxapi.client.default import DefaultConnectionProperties
 
 from db import init_db
-from bot.handlers import router
+from bot.handlers import router as handlers_router
+from bot.callbacks import router as callbacks_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,7 +31,7 @@ bot.params.clear()
 
 
 dp = Dispatcher()
-dp.include_routers(router)
+dp.include_routers(handlers_router, callbacks_router)
 
 
 async def main():
