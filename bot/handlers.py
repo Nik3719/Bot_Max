@@ -26,8 +26,8 @@ from db import (
     set_current_chat_id,
     count_user_chats,
 )
-from bot.menu import get_main_menu
-from bot.tools import try_create_new_chat, build_chats_keyboard
+from bot.tools import try_create_new_chat, build_chats_keyboard, generate_auto_title, get_main_menu
+from bot import texts
 
 from bot import (
     RegState,
@@ -45,15 +45,6 @@ router = Router()
 user_last_message_time: dict[int, float] = {}
 user_last_warning_time: dict[int, float] = {}
 
-def generate_auto_title(text: str, max_len: int = 30) -> str:
-    text = text.strip()
-    if len(text) <= max_len:
-        return text
-    truncated = text[:max_len]
-    last_space = truncated.rfind(' ')
-    if last_space > 20:
-        return truncated[:last_space] + '...'
-    return truncated + '...'
 
 
 @router.bot_started()
@@ -66,12 +57,12 @@ async def bot_started(event: BotStarted, context: MemoryContext):
 @router.message_created(RegState.WAIT_NAME)
 async def process_name(event: MessageCreated, context: MemoryContext):
     if not validate_name((event.message.body.text or "")):
-        await event.message.answer("❌ Некорректное ФИО. Пример: Иванов Иван Иванович")
+        await event.message.answer(texts.REG_INVALID_NAME)
         return
 
     await context.update_data(full_name=(event.message.body.text or ""))
 
-    await event.message.answer("📧 Введите ваш адрес электронной почты:")
+    await event.message.answer(texts.REG_ASK_EMAIL)
     await context.set_state(RegState.WAIT_EMAIL)
 
 
@@ -80,16 +71,16 @@ async def process_name(event: MessageCreated, context: MemoryContext):
 async def process_email(event: MessageCreated, context: MemoryContext):
     email = (event.message.body.text or "")
     if not validate_email(email):
-        await event.message.answer("❌ Некорректный email. Пример: ivanov@example.ru")
+        await event.message.answer(texts.REG_INVALID_EMAIL)
         return
 
     if await is_email_registered(email):
-        await event.message.answer("❌ Этот email уже зарегистрирован. Пожалуйста, введите другой:")
+        await event.message.answer(texts.REG_EMAIL_EXISTS)
         return
 
     await context.update_data(email=email)
 
-    await event.message.answer("📱 Введите ваш номер телефона:")
+    await event.message.answer(texts.REG_ASK_PHONE)
     await context.set_state(RegState.WAIT_PHONE)
 
 
@@ -98,11 +89,11 @@ async def process_email(event: MessageCreated, context: MemoryContext):
 async def process_phone(event: MessageCreated, context: MemoryContext):
     cleaned_phone = validate_and_clean_phone((event.message.body.text or ""))
     if not cleaned_phone:
-        await event.message.answer("❌ Некорректный номер. Пример: +79001234567")
+        await event.message.answer(texts.REG_INVALID_PHONE)
         return
 
     if await is_phone_registered(cleaned_phone):
-        await event.message.answer("❌ Этот номер телефона уже зарегистрирован. Пожалуйста, введите другой:")
+        await event.message.answer(texts.REG_PHONE_EXISTS)
         return
 
     await context.update_data(phone=cleaned_phone)
@@ -130,13 +121,13 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
 
     except Exception as e:
         logger.error(f"Ошибка при сохранении пользователя {event.message.sender.user_id} в БД: {e}")
-        await event.message.answer("❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.")
+        await event.message.answer(texts.REG_ERROR)
         return
 
     # Очищаем память состояний, так как регистрация закончена
     await context.clear()
 
-    await event.message.answer("✅ Регистрация завершена! Создан ваш первый чат.\nЗадайте вопрос — я отвечу с помощью ИИ 🤖")
+    await event.message.answer(texts.REG_SUCCESS)
     await context.set_state(RegState.CHAT)
 
 
@@ -159,27 +150,17 @@ async def cmd_start(event: MessageCreated, context: MemoryContext):
             current_chat_id = await create_chat(user_id)
             
         await event.message.answer(
-            "👋 Вы уже зарегистрированы! Просто напишите вопрос — я отвечу с помощью ИИ.",
+            texts.REG_ALREADY,
             attachments=[get_main_menu()]
         )
         await context.set_state(RegState.CHAT)
     else:
-        await event.message.answer("👋 Добро пожаловать! Для начала работы необходимо пройти регистрацию.\n\n📋 Введите ваше ФИО (Фамилия Имя Отчество):")
+        await event.message.answer(texts.REG_WELCOME)
         await context.set_state(RegState.WAIT_NAME)
 
 @router.message_created(RegState.CHAT, Command("help"))
 async def cmd_help(event: MessageCreated, context: MemoryContext):
-    text = (
-        "ℹ️ Доступные команды:\n\n"
-        "/newchat — новый чат\n"
-        "/chats — список чатов\n"
-        "/rename — переименовать текущий чат\n"
-        "/delete — удалить текущий чат\n"
-        "/clear — очистить историю сообщений текущего чата\n"
-        "/history — последние реплики\n"
-        "/stats — статистика"
-    )
-    await event.message.answer(text, attachments=[get_main_menu()])
+    await event.message.answer(texts.CMD_HELP, attachments=[get_main_menu()])
 
 @router.message_created(RegState.CHAT, Command("newchat"))
 async def cmd_newchat(event: MessageCreated, context: MemoryContext):
@@ -193,16 +174,16 @@ async def cmd_chats(event: MessageCreated, context: MemoryContext):
     chats = await get_user_chats(user_id)
     
     if not chats:
-        await event.message.answer("У вас нет активных чатов. Напишите /newchat чтобы создать.")
+        await event.message.answer(texts.CHAT_NO_ANY)
         return
         
     current_chat_id = await get_current_chat_id(user_id)
     markup = build_chats_keyboard(chats, current_chat_id)
-    await event.message.answer("Ваши чаты:", attachments=[markup])
+    await event.message.answer(texts.CHATS_LIST, attachments=[markup])
 
 @router.message_created(RegState.CHAT, Command("rename"))
 async def cmd_rename(event: MessageCreated, context: MemoryContext):
-    await event.message.answer("Введите новое название для чата (не более 60 символов):")
+    await event.message.answer(texts.CHAT_RENAME_PROMPT)
     await context.set_state(RegState.WAIT_CHAT_RENAME)
 
 @router.message_created(RegState.WAIT_CHAT_RENAME)
@@ -211,7 +192,7 @@ async def process_chat_rename(event: MessageCreated, context: MemoryContext):
     new_title = (event.message.body.text or "").strip()
     
     if not new_title:
-        await event.message.answer("Название не может быть пустым. Введите название:")
+        await event.message.answer(texts.CHAT_RENAME_EMPTY)
         return
         
     if len(new_title) > config.CHAT_TITLE_MAX_LEN:
@@ -220,9 +201,9 @@ async def process_chat_rename(event: MessageCreated, context: MemoryContext):
     current_chat_id = await get_current_chat_id(user_id)
     if current_chat_id:
         await update_chat_title(current_chat_id, new_title)
-        await event.message.answer(f"✅ Чат переименован в «{new_title}».")
+        await event.message.answer(texts.chat_renamed(new_title))
     else:
-        await event.message.answer("❌ Активный чат не найден.")
+        await event.message.answer(texts.CHAT_NOT_FOUND)
         
     await context.set_state(RegState.CHAT)
 
@@ -232,7 +213,7 @@ async def cmd_delete(event: MessageCreated, context: MemoryContext):
     current_chat_id = await get_current_chat_id(user_id)
     
     if not current_chat_id:
-        await event.message.answer("❌ У вас нет активного чата.")
+        await event.message.answer(texts.CHAT_NO_ACTIVE)
         return
         
     chat = await get_chat(current_chat_id)
@@ -241,11 +222,11 @@ async def cmd_delete(event: MessageCreated, context: MemoryContext):
     builder = InlineKeyboardBuilder()
     builder.row(
         CallbackButton(text="✅ Да", payload="confirm_delete"),
-        CallbackButton(text="❌ Нет", payload="cancel_delete")
+        CallbackButton(text="Нет", payload="cancel_delete")
     )
     markup = builder.as_markup()
     
-    await event.message.answer(f"Вы уверены, что хотите удалить чат «{title}»?", attachments=[markup])
+    await event.message.answer(texts.chat_delete_confirm(title), attachments=[markup])
 
 @router.message_created(RegState.CHAT, Command("clear"))
 async def cmd_clear(event: MessageCreated, context: MemoryContext):
@@ -253,21 +234,21 @@ async def cmd_clear(event: MessageCreated, context: MemoryContext):
     current_chat_id = await get_current_chat_id(user_id)
     if current_chat_id:
         await clear_chat_history(current_chat_id) 
-        await event.message.answer("ℹ️ История чата очищена. Начинайте новый разговор!")
+        await event.message.answer(texts.CHAT_CLEARED)
     else:
-        await event.message.answer("❌ У вас нет активного чата.")
+        await event.message.answer(texts.CHAT_NO_ACTIVE)
 
 @router.message_created(RegState.CHAT, Command("history"))
 async def cmd_history(event: MessageCreated, context: MemoryContext):
     user_id = event.message.sender.user_id
     current_chat_id = await get_current_chat_id(user_id)
     if not current_chat_id:
-        await event.message.answer("❌ У вас нет активного чата.")
+        await event.message.answer(texts.CHAT_NO_ACTIVE)
         return
         
     history = await get_chat_history(current_chat_id, 5)
     if not history:
-        await event.message.answer("💬 История пуста. Задайте первый вопрос!")
+        await event.message.answer(texts.CHAT_HISTORY_EMPTY)
         return
 
     formatted_history = "\n".join([f"{message['role']}: {message['content']}" for message in history])
@@ -279,15 +260,7 @@ async def cmd_stats(event: MessageCreated, context: MemoryContext):
     current_chat_id = await get_current_chat_id(user_id)
     
     stats = await get_chat_stats(user_id, current_chat_id)
-    text = (
-        f"ℹ️ Ваша статистика:\n"
-        f"• Всего чатов: {stats['total_chats']}\n"
-        f"• Сообщений в текущем чате: {stats['current_chat_messages']}\n"
-        f"• Всего сообщений: {stats['total_messages']}\n"
-        f"• Всего токенов: {stats['total_tokens']}\n"
-        f"• Зарегистрированы: {stats['registered_at']}"
-    )
-    await event.message.answer(text)
+    await event.message.answer(texts.chat_stats(stats))
 
 async def check_rate_limit(user_id: int, message_timestamp: int) -> tuple[bool, bool]:
     ts_sec = message_timestamp / 1000
@@ -329,7 +302,7 @@ async def send_long_message(event: MessageCreated, text: str, max_len: int = 300
 async def ensure_registered(event: MessageCreated, user_id: int) -> bool:
     is_registered = await search_user(user_id)
     if not is_registered:
-        await event.message.answer("⛔ У вас нет доступа к чату. Пройдите регистрацию — напишите /start")
+        await event.message.answer(texts.ACCESS_DENIED)
         return False
     return True
 
@@ -343,13 +316,13 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
 
     if user_text.startswith('/'):
         logger.info(f"Received unknown command: {repr(user_text)}")
-        await event.message.answer("⚠️ Неизвестная команда или опечатка. Введите /help для списка доступных команд.")
+        await event.message.answer(texts.UNKNOWN_CMD)
         return
 
     is_allowed, should_warn = await check_rate_limit(user_id_int, event.message.timestamp)
     if not is_allowed:
         if should_warn:
-            await event.message.answer("⚠️ Пожалуйста, не отправляйте сообщения так часто. Подождите немного.")
+            await event.message.answer(texts.SPAM_WARNING)
         return
 
     if not await ensure_registered(event, user_id_int):
@@ -361,12 +334,12 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     if not current_chat_id:
         chat_count = await count_user_chats(user_id_int)
         if chat_count >= config.MAX_CHATS_PER_USER:
-            await event.message.answer(f"⚠️ Достигнут лимит в {config.MAX_CHATS_PER_USER} чатов. Невозможно автоматически создать новый. Пожалуйста, удалите старые чаты через меню /chats.")
+            await event.message.answer(texts.chat_limit_reached_auto(config.MAX_CHATS_PER_USER))
             return
             
         current_chat_id = await create_chat(user_id_int)
         if not current_chat_id:
-            await event.message.answer("❌ Ошибка при создании чата.")
+            await event.message.answer(texts.CHAT_CREATE_ERROR)
             return
 
     chat = await get_chat(current_chat_id)
@@ -390,11 +363,11 @@ async def handle_ollama_request(event: MessageCreated, user_id_int: int, chat_id
         response = await ask_ollama(messages)
     except Exception as e:
         logger.error(f"Ошибка при запросе к Ollama: {e}")
-        await event.message.answer("⚠️ Не удалось получить ответ от ИИ из‑за ошибки сервера. Попробуйте позже.")
+        await event.message.answer(texts.AI_ERROR_SERVER)
         return
 
     if not response or "message" not in response or not response["message"].get("content"):
-        await event.message.answer("⚠️ Не удалось получить ответ от ИИ. Попробуйте позже.")
+        await event.message.answer(texts.AI_ERROR)
         return
 
     assistant_text = response["message"]["content"]
@@ -455,6 +428,6 @@ async def process_unregistered(event: MessageCreated, context: MemoryContext):
                 await handler(event, context)
             else:
                 logger.info(f"Received unknown command (state restored): {repr(user_text)}")
-                await event.message.answer("⚠️ Неизвестная команда или опечатка. Введите /help для списка доступных команд.")
+                await event.message.answer(texts.UNKNOWN_CMD)
         else:
             await process_chat_message(event, context)

@@ -2,61 +2,44 @@ from maxapi import Router
 from maxapi.context.context import MemoryContext
 from maxapi.types.updates.message_created import MessageCreated
 from magic_filter import F
-from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
-from maxapi.types.attachments.buttons import MessageButton
+from bot import texts
 
 menu_router = Router()
 
-def get_main_menu():
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        MessageButton(text="Новый чат"),
-        MessageButton(text="Мои чаты")
-    )
-    builder.row(
-        MessageButton(text="История"),
-        MessageButton(text="Очистить")
-    )
-    builder.row(
-        MessageButton(text="Удалить чат"),
-        MessageButton(text="Статистика")
-    )
-    builder.row(
-        MessageButton(text="Помощь")
-    )
-    return builder.as_markup()
+from bot.handlers import (
+    cmd_newchat,
+    cmd_chats,
+    cmd_history,
+    cmd_clear,
+    cmd_delete,
+    cmd_stats,
+    cmd_help
+)
 
-@menu_router.message_created(F.message.body.text == "Новый чат")
+@menu_router.message_created(F.message.body.text == texts.BTN_NEW_CHAT)
 async def menu_newchat(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_newchat
     await cmd_newchat(event, context)
 
-@menu_router.message_created(F.message.body.text == "Мои чаты")
+@menu_router.message_created(F.message.body.text == texts.BTN_CHATS)
 async def menu_chats(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_chats
     await cmd_chats(event, context)
 
-@menu_router.message_created(F.message.body.text == "История")
+@menu_router.message_created(F.message.body.text == texts.BTN_HISTORY)
 async def menu_history(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_history
     await cmd_history(event, context)
 
-@menu_router.message_created(F.message.body.text == "Очистить")
+@menu_router.message_created(F.message.body.text == texts.BTN_CLEAR)
 async def menu_clear(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_clear
     await cmd_clear(event, context)
 
-@menu_router.message_created(F.message.body.text == "Удалить чат")
+@menu_router.message_created(F.message.body.text == texts.BTN_DELETE)
 async def menu_delete(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_delete
     await cmd_delete(event, context)
 
-@menu_router.message_created(F.message.body.text == "Статистика")
+@menu_router.message_created(F.message.body.text == texts.BTN_STATS)
 async def menu_stats(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_stats
     await cmd_stats(event, context)
 
-@menu_router.message_created(F.message.body.text == "Помощь")
+@menu_router.message_created(F.message.body.text == texts.BTN_HELP)
 async def menu_help(event: MessageCreated, context: MemoryContext):
-    from bot.handlers import cmd_help
     await cmd_help(event, context)

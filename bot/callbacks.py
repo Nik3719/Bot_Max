@@ -18,6 +18,8 @@ from db import (
 )
 from bot.tools import try_create_new_chat, build_chats_keyboard
 
+from bot import texts
+
 logger = logging.getLogger(__name__)
 
 router = Router()
@@ -39,19 +41,19 @@ async def process_switch_chat(event: MessageCallback, context: MemoryContext):
             preview_history = await get_chat_history(chat_id, config.CHAT_PREVIEW_LINES)
             preview_text = "\n".join([f"ℹ️ {msg['role']}: {msg['content'][:50]}..." if len(msg['content']) > 50 else f"ℹ️ {msg['role']}: {msg['content']}" for msg in preview_history])
             
-            text = f"ℹ️ Вы переключились на чат «{chat['title']}»."
+            text = texts.chat_switched(chat["title"])
             if preview_text:
-                text += f"\nПоследние сообщения:\n{preview_text}"
+                text += texts.LAST_MESSAGES_HEADER + preview_text
                 
             await event.message.delete()
             await event.message.answer(text=text)
-            await event.answer(notification="Чат изменён!")
+            await event.answer(notification=texts.NOTIFY_CHAT_SWITCHED)
         else:
-            await event.answer(notification="Ошибка: чат не найден или вам не принадлежит.")
+            await event.answer(notification=texts.CHAT_SWITCH_ERROR)
 
     except Exception as e:
         logger.error(f"Ошибка при переключении чата {payload}: {e}")
-        await event.answer(notification="Произошла ошибка при выполнении действия.")
+        await event.answer(notification=texts.GENERAL_ERROR)
 
 
 @router.message_callback(F.callback.payload == "new_chat")
@@ -63,13 +65,13 @@ async def process_new_chat(event: MessageCallback, context: MemoryContext):
         if success:
             await event.message.delete()
             await event.message.answer(msg)
-            await event.answer(notification="Новый чат создан!")
+            await event.answer(notification=texts.NOTIFY_CHAT_CREATED)
         else:
             await event.answer(notification=msg)
 
     except Exception as e:
         logger.error(f"Ошибка при создании нового чата: {e}")
-        await event.answer(notification="Произошла ошибка при выполнении действия.")
+        await event.answer(notification=texts.GENERAL_ERROR)
 
 
 @router.message_callback(F.callback.payload == "confirm_delete")
@@ -84,7 +86,7 @@ async def process_confirm_delete(event: MessageCallback, context: MemoryContext)
         
         if current_chat_id:
             chat = await get_chat(current_chat_id)
-            title = chat['title'] if chat else "Неизвестный чат"
+            title = chat['title'] if chat else texts.UNKNOWN_CHAT_TITLE
             
             await delete_chat(current_chat_id)
             await set_current_chat_id(user_id, None)
@@ -93,29 +95,29 @@ async def process_confirm_delete(event: MessageCallback, context: MemoryContext)
             markup = build_chats_keyboard(chats, current_chat_id=None)
             
             await event.message.answer(
-                text=f"ℹ️ Чат «{title}» удалён.\n\nПожалуйста, выберите другой чат:", 
+                text=texts.chat_deleted(title), 
                 attachments=[markup]
             )
-            await event.answer(notification="Чат удалён")
+            await event.answer(notification=texts.NOTIFY_CHAT_DELETED)
         else:
-            await event.answer(notification="Активный чат не найден.")
+            await event.answer(notification=texts.CHAT_NOT_FOUND)
 
     except Exception as e:
         logger.error(f"Ошибка при удалении чата: {e}")
-        await event.answer(notification="Произошла ошибка при выполнении действия.")
+        await event.answer(notification=texts.GENERAL_ERROR)
 
 
 @router.message_callback(F.callback.payload == "cancel_delete")
 async def process_cancel_delete(event: MessageCallback, context: MemoryContext):
     try:
         await event.message.delete()
-        await event.answer(notification="Действие отменено.")
+        await event.answer(notification=texts.CHAT_DELETE_CANCELLED)
     except Exception as e:
         logger.error(f"Ошибка при отмене удаления: {e}")
-        await event.answer(notification="Произошла ошибка.")
+        await event.answer(notification=texts.GENERAL_ERROR)
 
 
 @router.message_callback()
 async def process_unknown_callback(event: MessageCallback, context: MemoryContext):
     logger.warning(f"Получен неизвестный callback: {event.callback.payload}")
-    await event.answer(notification="Неизвестное действие.")
+    await event.answer(notification=texts.UNKNOWN_ACTION)
