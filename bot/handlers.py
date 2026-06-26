@@ -27,6 +27,7 @@ from db import (
     count_user_chats,
 )
 from bot.menu import get_main_menu
+from bot.tools import try_create_new_chat, build_chats_keyboard
 
 from bot import (
     RegState,
@@ -183,17 +184,8 @@ async def cmd_help(event: MessageCreated, context: MemoryContext):
 @router.message_created(RegState.CHAT, Command("newchat"))
 async def cmd_newchat(event: MessageCreated, context: MemoryContext):
     user_id = event.message.sender.user_id
-    
-    chat_count = await count_user_chats(user_id)
-    if chat_count >= config.MAX_CHATS_PER_USER:
-        await event.message.answer(f"⚠️ Достигнут лимит в {config.MAX_CHATS_PER_USER} чатов. Удалите старые, чтобы создать новые.")
-        return
-        
-    chat_id = await create_chat(user_id)
-    if chat_id:
-        await event.message.answer("✅ Новый чат создан. Задайте первый вопрос!")
-    else:
-        await event.message.answer("❌ Ошибка при создании чата.")
+    success, msg = await try_create_new_chat(user_id)
+    await event.message.answer(msg)
 
 @router.message_created(RegState.CHAT, Command("chats"))
 async def cmd_chats(event: MessageCreated, context: MemoryContext):
@@ -205,17 +197,7 @@ async def cmd_chats(event: MessageCreated, context: MemoryContext):
         return
         
     current_chat_id = await get_current_chat_id(user_id)
-    
-    builder = InlineKeyboardBuilder()
-    
-    for idx, chat in enumerate(chats, start=1):
-        marker = "🟢" if chat['id'] == current_chat_id else "⚪"
-        btn_text = f"{marker} {chat['title']}"
-        builder.row(CallbackButton(text=btn_text, payload=f"switch_chat_{chat['id']}"))
-        
-    builder.row(CallbackButton(text="➕ Создать новый чат", payload="new_chat"))
-    
-    markup = builder.as_markup()
+    markup = build_chats_keyboard(chats, current_chat_id)
     await event.message.answer("Ваши чаты:", attachments=[markup])
 
 @router.message_created(RegState.CHAT, Command("rename"))
@@ -377,6 +359,11 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
     # Получаем текущий активный чат
     current_chat_id = await get_current_chat_id(user_id_int)
     if not current_chat_id:
+        chat_count = await count_user_chats(user_id_int)
+        if chat_count >= config.MAX_CHATS_PER_USER:
+            await event.message.answer(f"⚠️ Достигнут лимит в {config.MAX_CHATS_PER_USER} чатов. Невозможно автоматически создать новый. Пожалуйста, удалите старые чаты через меню /chats.")
+            return
+            
         current_chat_id = await create_chat(user_id_int)
         if not current_chat_id:
             await event.message.answer("❌ Ошибка при создании чата.")

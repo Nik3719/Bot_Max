@@ -15,8 +15,8 @@ from db import (
     create_chat,
     get_chat,
     get_chat_history,
-    count_user_chats,
 )
+from bot.tools import try_create_new_chat, build_chats_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +59,13 @@ async def process_new_chat(event: MessageCallback, context: MemoryContext):
     user_id = event.callback.user.user_id
 
     try:
-        chat_count = await count_user_chats(user_id)
-        if chat_count >= config.MAX_CHATS_PER_USER:
-            await event.answer(notification=f"Достигнут лимит в {config.MAX_CHATS_PER_USER} чатов.")
-            return
-            
-        new_chat_id = await create_chat(user_id)
-        if new_chat_id:
+        success, msg = await try_create_new_chat(user_id)
+        if success:
             await event.message.delete()
-            await event.message.answer("✅ Новый чат создан. Задайте первый вопрос!")
+            await event.message.answer(msg)
             await event.answer(notification="Новый чат создан!")
         else:
-            await event.answer(notification="Ошибка при создании чата.")
+            await event.answer(notification=msg)
 
     except Exception as e:
         logger.error(f"Ошибка при создании нового чата: {e}")
@@ -95,15 +90,11 @@ async def process_confirm_delete(event: MessageCallback, context: MemoryContext)
             await set_current_chat_id(user_id, None)
             
             chats = await get_user_chats(user_id)
-            
-            builder = InlineKeyboardBuilder()
-            for c in chats:
-                builder.row(CallbackButton(text=f"⚪ {c['title']}", payload=f"switch_chat_{c['id']}"))
-            builder.row(CallbackButton(text="➕ Создать новый чат", payload="new_chat"))
+            markup = build_chats_keyboard(chats, current_chat_id=None)
             
             await event.message.answer(
                 text=f"ℹ️ Чат «{title}» удалён.\n\nПожалуйста, выберите другой чат:", 
-                attachments=[builder.as_markup()]
+                attachments=[markup]
             )
             await event.answer(notification="Чат удалён")
         else:

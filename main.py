@@ -32,7 +32,7 @@ bot.params.clear()
 
 
 dp = Dispatcher()
-# Подключаем роутеры (важен порядок: меню ловит текст кнопок раньше общего обработчика сообщений)
+# Подключаем роутеры
 dp.include_routers(menu_router, handlers_router, callbacks_router)
 
 
