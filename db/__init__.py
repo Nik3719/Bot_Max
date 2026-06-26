@@ -8,4 +8,12 @@ from .database import (
     add_chat_message,
     clear_chat_history,
     get_chat_stats,
+    create_chat,
+    get_user_chats,
+    get_chat,
+    update_chat_title,
+    delete_chat,
+    get_current_chat_id,
+    set_current_chat_id,
+    count_user_chats,
 )

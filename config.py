@@ -17,7 +17,10 @@ OLLAMA_SYSTEM_PROMPT = os.getenv(
     "Ты полезный ассистент. Отвечай на русском языке, если вопрос задан на русском."
 )
 CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", 10))
-
+MAX_CHATS_PER_USER = int(os.getenv("MAX_CHATS_PER_USER", 50))
+CHAT_TITLE_MAX_LEN = int(os.getenv("CHAT_TITLE_MAX_LEN", 60))
+AUTO_TITLE_MAX_LEN = int(os.getenv("AUTO_TITLE_MAX_LEN", 30))
+CHAT_PREVIEW_LINES = int(os.getenv("CHAT_PREVIEW_LINES", 3))
 if not BOT_TOKEN:
     raise ValueError("""Токен бота не найден!
     Убедитесь, что переменная BOT_TOKEN задана в файле .env""")

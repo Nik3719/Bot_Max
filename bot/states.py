@@ -6,3 +6,4 @@ class RegState(StatesGroup):
     WAIT_EMAIL = State()
     WAIT_PHONE = State()
     CHAT = State()
+    WAIT_CHAT_RENAME = State()
