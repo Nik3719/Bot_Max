@@ -52,7 +52,7 @@ SELECT_USER_BY_ID = "select max_user_id from users where max_user_id=?;"
 SELECT_USER_ID_BY_EMAIL = "select id from users where email=?;"
 SELECT_USER_ID_BY_PHONE = "select id from users where phone=?;"
 INSERT_USER = "insert into users (max_user_id, full_name, email, phone) values (?, ?, ?, ?);"
-SELECT_CHAT_HISTORY = "select role, content from chat_messages where chat_id = ? order by created_at desc limit ?;"
+SELECT_CHAT_HISTORY = "select role, content from chat_messages where chat_id = ? order by created_at desc, id desc limit ?;"
 INSERT_CHAT_MESSAGE = """
 insert into chat_messages (chat_id, max_user_id, role, content, model, prompt_tokens, completion_tokens, duration_ms)
 values (?, ?, ?, ?, ?, ?, ?, ?);
