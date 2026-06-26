@@ -447,22 +447,21 @@ async def process_unregistered(event: MessageCreated, context: MemoryContext):
         user_text = event.message.body.text or ""
         if user_text.startswith('/'):
             cmd = user_text.split()[0]
-            if cmd == '/help':
-                await cmd_help(event, context)
-            elif cmd == '/newchat':
-                await cmd_newchat(event, context)
-            elif cmd == '/chats':
-                await cmd_chats(event, context)
-            elif cmd == '/rename':
-                await cmd_rename(event, context)
-            elif cmd == '/delete':
-                await cmd_delete(event, context)
-            elif cmd == '/clear':
-                await cmd_clear(event, context)
-            elif cmd == '/history':
-                await cmd_history(event, context)
-            elif cmd == '/stats':
-                await cmd_stats(event, context)
+            
+            command_handlers = {
+                '/help': cmd_help,
+                '/newchat': cmd_newchat,
+                '/chats': cmd_chats,
+                '/rename': cmd_rename,
+                '/delete': cmd_delete,
+                '/clear': cmd_clear,
+                '/history': cmd_history,
+                '/stats': cmd_stats,
+            }
+            
+            handler = command_handlers.get(cmd)
+            if handler:
+                await handler(event, context)
             else:
                 logger.info(f"Received unknown command (state restored): {repr(user_text)}")
                 await event.message.answer("⚠️ Неизвестная команда или опечатка. Введите /help для списка доступных команд.")
