@@ -41,12 +41,16 @@ pip install -r requirements.txt
 BOT_TOKEN=ваш_токен
 BOT_LINK=https://max.ru/id_bot
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=qwen2:0.5b
+OLLAMA_MODEL=llama3.2:3b
 OLLAMA_TIMEOUT=120
 OLLAMA_TEMPERATURE=0.7
 OLLAMA_NUM_CTX=4096
 OLLAMA_SYSTEM_PROMPT="Ты полезный ассистент. Отвечай на русском языке, если вопрос задан на русском."
 CHAT_HISTORY_LIMIT=10
+MAX_CHATS_PER_USER=50
+CHAT_TITLE_MAX_LEN=60
+AUTO_TITLE_MAX_LEN=30
+CHAT_PREVIEW_LINES=3
 ```
 
 Запустить проект:
