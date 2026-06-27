@@ -36,6 +36,8 @@ BTN_DELETE = "Удалить чат"
 BTN_STATS = "Статистика"
 BTN_HELP = "Помощь"
 BTN_CREATE_NEW_CHAT = "➕ Создать новый чат"
+BTN_CONFIRM_DELETE = "✅ Да, удалить"
+BTN_CANCEL = "Отмена"
 
 # Управление чатами (Сообщения) (bot.handlers, bot.callbacks, bot.tools)
 CHAT_NEW_SUCCESS = "✅ Новый чат создан. Задайте первый вопрос!"
@@ -64,10 +66,14 @@ def chat_switched(title: str) -> str:
     return f"ℹ️ Вы переключились на чат «{title}»."
 
 def chat_delete_confirm(title: str) -> str:
-    return f"Вы уверены, что хотите удалить чат «{title}»?"
+    return f"Удалить чат «{title}»? Это действие нельзя отменить."
 
 def chat_deleted(title: str) -> str:
     return f"ℹ️ Чат «{title}» удалён.\n\nПожалуйста, выберите другой чат:"
+
+
+def chat_deleted_last(title: str) -> str:
+    return f"ℹ️ Чат «{title}» удалён."
 
 def chat_renamed(title: str) -> str:
     return f"✅ Чат переименован в «{title}»."

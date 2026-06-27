@@ -221,8 +221,8 @@ async def cmd_delete(event: MessageCreated, context: MemoryContext):
     
     builder = InlineKeyboardBuilder()
     builder.row(
-        CallbackButton(text="✅ Да", payload="confirm_delete"),
-        CallbackButton(text="Нет", payload="cancel_delete")
+        CallbackButton(text=texts.BTN_CONFIRM_DELETE, payload="confirm_delete"),
+        CallbackButton(text=texts.BTN_CANCEL, payload="cancel_delete")
     )
     markup = builder.as_markup()
     
@@ -343,7 +343,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
             return
 
     chat = await get_chat(current_chat_id)
-    is_first_message = chat['title'] == 'Новый чат' if chat else False
+    is_first_message = (chat['title'] == 'Новый чат') if chat else False
 
     history = await get_chat_history(current_chat_id, config.CHAT_HISTORY_LIMIT)
     messages = build_messages(history, user_text)

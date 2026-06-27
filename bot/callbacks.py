@@ -15,6 +15,7 @@ from db import (
     create_chat,
     get_chat,
     get_chat_history,
+    get_current_chat_id,
 )
 from bot.tools import try_create_new_chat, build_chats_keyboard
 
@@ -81,23 +82,29 @@ async def process_confirm_delete(event: MessageCallback, context: MemoryContext)
     try:
         await event.message.delete()
         
-        from db.database import get_current_chat_id
         current_chat_id = await get_current_chat_id(user_id)
-        
+
         if current_chat_id:
             chat = await get_chat(current_chat_id)
             title = chat['title'] if chat else texts.UNKNOWN_CHAT_TITLE
-            
+
             await delete_chat(current_chat_id)
             await set_current_chat_id(user_id, None)
-            
+
             chats = await get_user_chats(user_id)
-            markup = build_chats_keyboard(chats, current_chat_id=None)
-            
-            await event.message.answer(
-                text=texts.chat_deleted(title), 
-                attachments=[markup]
-            )
+
+            if not chats:
+                new_id = await create_chat(user_id)
+                await set_current_chat_id(user_id, new_id)
+                await event.message.answer(texts.chat_deleted_last(title))
+                await event.message.answer(texts.CHAT_NEW_SUCCESS)
+            else:
+                markup = build_chats_keyboard(chats, current_chat_id=None)
+                await event.message.answer(
+                    text=texts.chat_deleted(title),
+                    attachments=[markup]
+                )
+
             await event.answer(notification=texts.NOTIFY_CHAT_DELETED)
         else:
             await event.answer(notification=texts.CHAT_NOT_FOUND)
