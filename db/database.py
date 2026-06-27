@@ -1,11 +1,11 @@
 import aiosqlite
 import logging
+from db.queries_sql import *
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = "db/bot_users.db"
 
-from db.queries_sql import *
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:

@@ -98,10 +98,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
 
     await context.update_data(phone=cleaned_phone)
 
-    # Достаем все собранные данные (ФИО, почта, телефон) из памяти
     user_data = await context.get_data()
-
-    # Собираем словарь для нашей функции add_user
     user_dict = {
         "max_user_id": event.message.sender.user_id,
         "full_name": user_data["full_name"],
@@ -109,12 +106,9 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
         "phone": user_data["phone"],
     }
 
-    # Сохраняем в базу данных
     try:
         await add_user(user_dict)
         logger.info(f"Пользователь {event.message.sender.user_id} успешно зарегистрирован")
-        
-        # Создаем первый чат
         chat_id = await create_chat(event.message.sender.user_id)
         if chat_id:
             await context.update_data(current_chat_id=chat_id)
@@ -124,7 +118,7 @@ async def process_phone(event: MessageCreated, context: MemoryContext):
         await event.message.answer(texts.REG_ERROR)
         return
 
-    # Очищаем память состояний, так как регистрация закончена
+    # Сбрасываем состояние после успешной регистрации
     await context.clear()
 
     await event.message.answer(texts.REG_SUCCESS)
@@ -315,7 +309,7 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         return
 
     if user_text.startswith('/'):
-        logger.info(f"Received unknown command: {repr(user_text)}")
+        logger.info(f"Неизвестная команда: {repr(user_text)}")
         await event.message.answer(texts.UNKNOWN_CMD)
         return
 
@@ -329,14 +323,13 @@ async def process_chat_message(event: MessageCreated, context: MemoryContext):
         await context.clear()
         return
 
-    # Получаем текущий активный чат
     current_chat_id = await get_current_chat_id(user_id_int)
     if not current_chat_id:
         chat_count = await count_user_chats(user_id_int)
         if chat_count >= config.MAX_CHATS_PER_USER:
             await event.message.answer(texts.chat_limit_reached_auto(config.MAX_CHATS_PER_USER))
             return
-            
+
         current_chat_id = await create_chat(user_id_int)
         if not current_chat_id:
             await event.message.answer(texts.CHAT_CREATE_ERROR)
@@ -427,7 +420,7 @@ async def process_unregistered(event: MessageCreated, context: MemoryContext):
             if handler:
                 await handler(event, context)
             else:
-                logger.info(f"Received unknown command (state restored): {repr(user_text)}")
+                logger.info(f"Неизвестная команда (состояние восстановлено): {repr(user_text)}")
                 await event.message.answer(texts.UNKNOWN_CMD)
         else:
             await process_chat_message(event, context)
