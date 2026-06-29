@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.git/
+.vscode/
+bot.log
+*.txt
+!requirements.txt
+*.pdf
