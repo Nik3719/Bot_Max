@@ -81,7 +81,7 @@ python main.py
    ```bash
    docker compose up -d
    ```
-3. Скачайте нужную модель внутри запущенного контейнера Ollama. Для этого выполните команду:
+3. Скачайте нужную модель внутри запущенного контейнера Ollama.
 
 ```
    docker exec -it max_ollama ollama pull qwen2:0.5b
